@@ -1,6 +1,6 @@
 {
   "name": "@itonami/maps",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "itonami": {
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run build && node --max-old-space-size=4096 --test test/*.test.mjs",
     "tauri": "tauri",
     "build:desktop": "npm run build && tauri build --no-bundle",
     "build:android": "npm run build && tauri android build --apk --target aarch64"

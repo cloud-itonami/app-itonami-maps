@@ -29,14 +29,24 @@ export function buildPaths(map) {
   return { countries, graticule };
 }
 
+/** Route polyline [[lon,lat],...] → Path2D in world units. */
+export function buildRoutePath(coords) {
+  const path = new Path2D();
+  coords.forEach(([lon, lat], i) => { const [x, y] = project(lon, lat); if (i === 0) path.moveTo(x, y); else path.lineTo(x, y); });
+  return path;
+}
+
 export function readColors(element) {
   const style = getComputedStyle(element);
   const v = (name) => style.getPropertyValue(name).trim();
-  return { sea: v("--sea"), land: v("--land"), border: v("--border"), grid: v("--grid"), selected: v("--selected") };
+  return { sea: v("--sea"), land: v("--land"), border: v("--border"), grid: v("--grid"), selected: v("--selected"), route: v("--route"), start: v("--start"), end: v("--end"), halo: v("--bg") };
 }
 
-/** Draw one frame. size = CSS px and device pixel ratio of the canvas. */
-export function draw(ctx, size, view, paths, colors, selectedA3) {
+/**
+ * Draw one frame. size = CSS px and device pixel ratio of the canvas.
+ * overlay = { route: Path2D|null, points: [{ lon, lat, color }] } (optional).
+ */
+export function draw(ctx, size, view, paths, colors, selectedA3, overlay = null) {
   const { width, height, dpr } = size;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = colors.sea;
@@ -62,6 +72,18 @@ export function draw(ctx, size, view, paths, colors, selectedA3) {
       ctx.strokeStyle = colors.selected;
       ctx.lineWidth = 2 * px;
       ctx.stroke(sel.path);
+    }
+    if (overlay?.route) {
+      ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.strokeStyle = colors.halo; ctx.lineWidth = 7 * px; ctx.stroke(overlay.route);
+      ctx.strokeStyle = colors.route; ctx.lineWidth = 4 * px; ctx.stroke(overlay.route);
+    }
+    for (const p of overlay?.points ?? []) {
+      const [x, y] = project(p.lon, p.lat);
+      ctx.beginPath(); ctx.arc(x, y, 8 * px, 0, 2 * Math.PI);
+      ctx.fillStyle = colors.halo; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 6 * px, 0, 2 * Math.PI);
+      ctx.fillStyle = colors[p.color] ?? p.color; ctx.fill();
     }
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
