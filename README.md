@@ -1,5 +1,10 @@
 # app-maps
 
+> **Awai app (2026-11-18):** [`app/`](app/README.md) is the new user-side world
+> map — a Tauri v3 app for Android and desktop that works offline and makes one
+> consented, digest-pinned download. It is independent of the four legacy
+> subsystems below and of their Cloudflare/RisingWave deployment.
+
 Spatial intelligence application extracted from the etzhayyim monorepo. It is
 four separate subsystems that share a repository, not one program:
 
