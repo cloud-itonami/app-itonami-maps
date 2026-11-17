@@ -1,0 +1,1 @@
+{"identifier":"maps-local","description":"Read-only host info. No filesystem, shell, installer or host network permission; the consented detail download runs in the WebView.","windows":["main"],"permissions":["allow-awai-host-info"]}

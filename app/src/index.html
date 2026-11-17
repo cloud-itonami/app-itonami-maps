@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost https://raw.githubusercontent.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>地図</title>
+<link rel="stylesheet" href="kotoba-client-consent.css">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="bar">
+  <h1>地図</h1>
+  <div class="search">
+    <input id="search" type="search" placeholder="国名・ISO コードで探す" aria-label="国を探す" autocomplete="off" enterkeyhint="search" aria-controls="results">
+    <ul id="results" role="listbox" hidden></ul>
+  </div>
+</header>
+<main class="stage">
+  <canvas id="map" tabindex="0" aria-label="世界地図。ドラッグで移動、ホイールかピンチで拡大縮小、タップで国を選択"></canvas>
+  <div class="zoom" role="group" aria-label="拡大縮小">
+    <button id="zoom-in" type="button" aria-label="拡大">+</button>
+    <button id="zoom-out" type="button" aria-label="縮小">−</button>
+    <button id="zoom-world" type="button" aria-label="世界全体を表示">⌂</button>
+  </div>
+  <p class="attribution">地図データ: <span id="source">Natural Earth 1:110m</span>（パブリックドメイン）</p>
+</main>
+<section class="panel" aria-live="polite">
+  <div id="country"><p class="muted">国をタップすると、名前と ISO コードを表示します。</p></div>
+  <details id="detail">
+    <summary>詳細な国境データ</summary>
+    <p class="muted">この端末には 1:110m の世界地図が入っていて、通信なしで使えます。1:50m の詳細な国境（約 3.1 MB）は、許可したときだけ raw.githubusercontent.com から取得し、SHA-256 を確かめてから端末に保存します。</p>
+    <div class="row">
+      <button id="detail-get" type="button">取得する</button>
+      <button id="detail-forget" type="button" class="secondary" hidden>端末から削除</button>
+    </div>
+    <p id="detail-status" class="muted" role="status"></p>
+  </details>
+  <p id="env" class="muted"></p>
+</section>
+</body>
+</html>
