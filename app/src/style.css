@@ -1,13 +1,13 @@
 :root {
   color-scheme: light dark;
   --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --card: #ffffff; --line: #e2e2dc; --accent: #2f5f8f; --err: #a33;
-  --sea: #dbe7f1; --land: #f3f0e6; --border: #a9a294; --grid: #c6d6e4; --selected: #d0632b;
+  --sea: #dbe7f1; --land: #f3f0e6; --border: #a9a294; --grid: #c6d6e4; --selected: #d0632b; --route: #1f6fd1; --start: #2e8b57; --end: #c0392b;
   font: 15px/1.5 system-ui, -apple-system, "Hiragino Sans", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #161615; --fg: #ececea; --muted: #9a9a94; --card: #1f1f1d; --line: #33332f; --accent: #8db7e0; --err: #f08a8a;
-    --sea: #0f1b26; --land: #2a2b27; --border: #5f5d55; --grid: #1c2c3a; --selected: #f0935e;
+    --sea: #0f1b26; --land: #2a2b27; --border: #5f5d55; --grid: #1c2c3a; --selected: #f0935e; --route: #5aa9ff; --start: #5fd08f; --end: #ff7a6b;
   }
 }
 * { box-sizing: border-box; }
@@ -48,3 +48,19 @@ details summary { cursor: pointer; font-size: .9rem; }
   .bar { grid-column: 1 / -1; }
   .panel { border-top: 0; border-left: 1px solid var(--line); max-height: none; }
 }
+#nav[open] { display: flex; flex-direction: column; gap: 8px; }
+.endpoint { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; }
+.endpoint .dot { width: 12px; height: 12px; border-radius: 50%; }
+.endpoint .dot.start { background: var(--start); }
+.endpoint .dot.end { background: var(--end); }
+/* In the flow, not a popup: the panel scrolls, and a popup would be clipped by it. */
+.endpoint ul { grid-column: 2 / -1; margin: 0; padding: 4px; list-style: none; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.endpoint li { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.endpoint li:hover, .endpoint li[aria-selected="true"] { background: var(--line); }
+button.pick { padding: 6px 10px; }
+button.pick[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.summary { font-size: 1rem; font-weight: 600; margin: 0; }
+ol.steps { margin: 0; padding-left: 1.4em; font-size: .85rem; display: flex; flex-direction: column; gap: 2px; }
+.hint { font-size: .8rem; color: var(--muted); margin: 0; }
+input[type="checkbox"] { width: auto; margin: 0; }
+label.hint { display: flex; align-items: center; gap: 6px; }

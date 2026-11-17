@@ -29,6 +29,35 @@
 </main>
 <section class="panel" aria-live="polite">
   <div id="country"><p class="muted">国をタップすると、名前と ISO コードを表示します。</p></div>
+  <details id="nav" open>
+    <summary>経路</summary>
+    <div class="endpoint">
+      <span class="dot start" aria-hidden="true"></span>
+      <input id="from" type="search" placeholder="出発地（都市名）" aria-label="出発地" autocomplete="off" aria-controls="from-results">
+      <button id="from-pick" type="button" class="secondary pick" aria-pressed="false" title="地図をタップして出発地を選ぶ">地図で</button>
+      <ul id="from-results" role="listbox" hidden></ul>
+    </div>
+    <div class="endpoint">
+      <span class="dot end" aria-hidden="true"></span>
+      <input id="to" type="search" placeholder="目的地（都市名）" aria-label="目的地" autocomplete="off" aria-controls="to-results">
+      <button id="to-pick" type="button" class="secondary pick" aria-pressed="false" title="地図をタップして目的地を選ぶ">地図で</button>
+      <ul id="to-results" role="listbox" hidden></ul>
+    </div>
+    <label class="hint"><input id="avoid-ferries" type="checkbox"> フェリーを使わない</label>
+    <div class="row">
+      <button id="route-go" type="button">経路を検索</button>
+      <button id="route-clear" type="button" class="secondary">消す</button>
+    </div>
+    <div id="route-result" aria-live="polite"></div>
+    <div id="roads">
+      <p class="hint">経路は端末内で計算します。そのための道路データ（Natural Earth 1:10m の主要道路とフェリー、約 50 MB）は、許可したときだけ raw.githubusercontent.com から取得し、SHA-256 を確かめてから端末内で変換・保存します。都市間の目安で、細かい道の案内ではありません。</p>
+      <div class="row">
+        <button id="roads-get" type="button">道路データを取得</button>
+        <button id="roads-forget" type="button" class="secondary" hidden>道路データを削除</button>
+      </div>
+      <p id="roads-status" class="muted" role="status"></p>
+    </div>
+  </details>
   <details id="detail">
     <summary>詳細な国境データ</summary>
     <p class="muted">この端末には 1:110m の世界地図が入っていて、通信なしで使えます。1:50m の詳細な国境（約 3.1 MB）は、許可したときだけ raw.githubusercontent.com から取得し、SHA-256 を確かめてから端末に保存します。</p>

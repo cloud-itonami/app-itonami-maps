@@ -8,26 +8,34 @@ import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { clientRuntimeProblems, clientRuntimeConnectSrc, createClientOperationBroker, verifyClientArtifact } from "../vendor/kotoba-client-runtime.js";
 import { decodeDetail, detailOperation } from "../dist/detail.js";
+import { roadsOperation, graphFromArtifact } from "../dist/roads.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (p) => readFile(resolve(root, p), "utf8");
 const descriptor = JSON.parse(await read("src/descriptor.json"));
 const op = detailOperation(descriptor);
+const roadsOp = roadsOperation(descriptor);
+const capabilities = descriptor.operations.map((o) => o.capability);
 
-test("the descriptor declares exactly one pinned, read-only download", () => {
-  assert.deepEqual(clientRuntimeProblems(descriptor, [op.capability], []), []);
-  assert.equal(descriptor.operations.length, 1);
-  assert.equal(op.consent, "each-operation");
-  assert.equal(op.endpoint.method, "GET");
-  assert.equal(op.endpoint.origin, "https://raw.githubusercontent.com");
-  assert.ok(op.endpoint.path.includes(op.artifact.revision), "the path is pinned to the same revision");
-  assert.equal(op["redirect-origins"], undefined, "no redirect is followed");
+test("the descriptor declares exactly two pinned, read-only downloads", () => {
+  assert.deepEqual(clientRuntimeProblems(descriptor, capabilities, []), []);
+  assert.equal(descriptor.operations.length, 2);
+  for (const o of [op, roadsOp]) {
+    assert.equal(o.consent, "each-operation");
+    assert.equal(o.endpoint.method, "GET");
+    assert.equal(o.endpoint.origin, "https://raw.githubusercontent.com");
+    assert.ok(o.endpoint.path.includes(o.artifact.revision), "the path is pinned to the same revision");
+    assert.equal(o["redirect-origins"], undefined, "no redirect is followed");
+    assert.deepEqual(o["data-categories"], ["ip-address", "user-agent"], "no location or route data is sent");
+  }
+  assert.notEqual(op.capability, roadsOp.capability, "each download is approved on its own");
+  assert.ok(roadsOp.endpoint.path.endsWith("/geojson/ne_10m_roads.geojson"));
   assert.equal(descriptor.workers.length, 0);
   assert.equal(descriptor["local-state"].adapter, "indexeddb");
 });
 
 test("page and Tauri CSP allow only the declared origin besides IPC", async () => {
-  const derived = clientRuntimeConnectSrc(descriptor, [op.capability], [], []);
+  const derived = clientRuntimeConnectSrc(descriptor, capabilities, [], []);
   assert.equal(derived, "connect-src https://raw.githubusercontent.com");
   const html = await read("src/index.html");
   const conf = JSON.parse(await read("src-tauri/tauri.conf.json"));
@@ -70,7 +78,7 @@ test("release manifest pins every shipped file and the vendored runtime", async 
 // A stand-in for the trusted consent host: the broker accepts only hosts that
 // the runtime itself registered, so build one with a fake document whose
 // dialog we drive. Denying must leave fetch untouched.
-async function brokerWith(answer) {
+async function brokerWith(answer, operation = op) {
   const calls = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => { calls.push(String(input?.url ?? input)); return new Response("{}"); };
@@ -78,8 +86,8 @@ async function brokerWith(answer) {
     const runtime = await import("../vendor/kotoba-client-runtime.js");
     const host = fakeConsentHost(runtime, answer);
     const broker = createClientOperationBroker({
-      runtime: descriptor, requestedCapabilities: [op.capability], approvedOperations: [op],
-      hostSupportedOperations: [[op.capability, op.service, op.operation]], consentHost: host.handle,
+      runtime: descriptor, requestedCapabilities: capabilities, approvedOperations: [operation],
+      hostSupportedOperations: [[operation.capability, operation.service, operation.operation]], consentHost: host.handle,
     });
     return { broker, calls, host, restore: () => { globalThis.fetch = originalFetch; } };
   } catch (error) { globalThis.fetch = originalFetch; throw error; }
@@ -123,6 +131,22 @@ test("denying the consent dialog sends no request", async () => {
     assert.equal(host.seen.length, 1, "the dialog was shown");
     assert.deepEqual(calls, [], "no request was sent");
   } finally { restore(); }
+});
+
+test("denying the road download sends no request", async () => {
+  const { broker, calls, host, restore } = await brokerWith("deny", roadsOp);
+  try {
+    await assert.rejects(broker.invoke({ capability: roadsOp.capability, service: roadsOp.service, operation: roadsOp.operation }, { input: roadsOp.endpoint.origin + roadsOp.endpoint.path }), /not approved/);
+    assert.equal(host.seen.length, 1);
+    assert.deepEqual(calls, []);
+    // The border download is a different operation: approval of one cannot be used for the other.
+    await assert.rejects(broker.invoke({ capability: op.capability, service: op.service, operation: op.operation }, { input: op.endpoint.origin + op.endpoint.path }), /not eligible/);
+  } finally { restore(); }
+});
+
+test("road data is used only from a verified artifact with the pinned digest", async () => {
+  await assert.rejects(graphFromArtifact({ verified: false, sha256: roadsOp.artifact.sha256, blob: new Blob(["{}"]) }, roadsOp), /not verified/);
+  await assert.rejects(graphFromArtifact({ verified: true, sha256: "0".repeat(64), blob: new Blob(["{}"]) }, roadsOp), /not verified/);
 });
 
 test("an undeclared request is refused before any dialog or request", async () => {

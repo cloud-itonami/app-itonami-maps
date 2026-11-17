@@ -35,7 +35,9 @@ export function createDetailSource({ descriptor, store, consentHost }) {
   const selector = { capability: op.capability, service: op.service, operation: op.operation };
   const broker = createClientOperationBroker({
     runtime: descriptor,
-    requestedCapabilities: [op.capability],
+    // The runtime validates the whole descriptor, so every declared capability
+    // is requested; only this one operation is eligible through this broker.
+    requestedCapabilities: descriptor.operations.map((o) => o.capability),
     approvedOperations: [op],
     hostSupportedOperations: [[op.capability, op.service, op.operation]],
     consentHost,

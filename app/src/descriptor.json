@@ -3,7 +3,11 @@
   "target": "browser",
   "profile": "trusted-page-v1",
   "entry": "index.html",
-  "local-state": { "adapter": "indexeddb", "schema": "itonami.maps.v1", "version": 1 },
+  "local-state": {
+    "adapter": "indexeddb",
+    "schema": "itonami.maps.v1",
+    "version": 1
+  },
   "workers": [],
   "operations": [
     {
@@ -11,7 +15,10 @@
       "service": "natural-earth",
       "operation": "download-admin0-countries-50m",
       "consent": "each-operation",
-      "data-categories": ["ip-address", "user-agent"],
+      "data-categories": [
+        "ip-address",
+        "user-agent"
+      ],
       "endpoint": {
         "origin": "https://raw.githubusercontent.com",
         "method": "GET",
@@ -21,6 +28,26 @@
         "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
         "sha256": "3e458fc036ad0a66411f2c1e6cac49c5d7bfb81cb1123bc513b22511a2b7fdeb",
         "max-bytes": 4000000
+      }
+    },
+    {
+      "capability": "maps.roads.download",
+      "service": "natural-earth",
+      "operation": "download-roads-10m",
+      "consent": "each-operation",
+      "data-categories": [
+        "ip-address",
+        "user-agent"
+      ],
+      "endpoint": {
+        "origin": "https://raw.githubusercontent.com",
+        "method": "GET",
+        "path": "/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_roads.geojson"
+      },
+      "artifact": {
+        "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
+        "sha256": "66a0c7b438e92fd124822cc5921cfa11042f48c294ade5e0f03f2c6640fd0248",
+        "max-bytes": 52000000
       }
     }
   ]

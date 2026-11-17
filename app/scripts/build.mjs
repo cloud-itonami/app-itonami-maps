@@ -35,15 +35,17 @@ if (conf.app.security.csp !== CSP) throw new Error("tauri.conf.json CSP is not t
 
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
-const sources = ["index.html", "style.css", "app.js", "geo.js", "map.js", "store.js", "detail.js"];
+const sources = ["index.html", "style.css", "app.js", "geo.js", "map.js", "store.js", "detail.js", "route.js", "roads.js"];
 for (const name of sources) await copyFile(resolve(root, "src", name), join(out, name));
 for (const name of Object.keys(pins.files)) await copyFile(resolve(root, "vendor", name), join(out, name));
 await writeFile(join(out, "descriptor.json"), JSON.stringify(descriptor, null, 2) + "\n");
 await writeFile(join(out, "descriptor.js"), `export default ${JSON.stringify(descriptor)};\n`);
 const basemap = (await readFile(resolve(root, "src/data/world-110m.json"), "utf8")).trim();
 await writeFile(join(out, "basemap.js"), `export default ${basemap};\n`);
+const placeList = (await readFile(resolve(root, "src/data/places-50m.json"), "utf8")).trim();
+await writeFile(join(out, "places.js"), `export default ${placeList};\n`);
 
-const names = [...sources, ...Object.keys(pins.files), "descriptor.json", "descriptor.js", "basemap.js"];
+const names = [...sources, ...Object.keys(pins.files), "descriptor.json", "descriptor.js", "basemap.js", "places.js"];
 const files = {};
 for (const name of names) files[name] = sha(await readFile(join(out, name)));
 await writeFile(join(out, "release.json"), JSON.stringify({
