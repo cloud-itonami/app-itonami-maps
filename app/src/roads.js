@@ -1,11 +1,13 @@
 // The road network for on-device routing. Downloading it is the second
 // declared external operation: the pinned Natural Earth 1:10m roads file,
-// fetched only through the shared Kotoba broker after a fresh approval, with
-// its SHA-256 checked before use. Denying sends no request. The file is turned
+// gzipped on Yataverse (mirror.js), fetched only through the shared Kotoba
+// broker after a fresh approval. The block's SHA-256 and the decompressed
+// file's upstream digest are both checked. Denying sends no request. The file is turned
 // into a compact graph on this device and only the graph is kept (IndexedDB).
 // Every route is then computed locally with no network.
 import { createClientOperationBroker } from "./kotoba-client-runtime.js";
 import { buildRoadGraph, graphProblems, indexGraph } from "./route.js";
+import { MIRRORED, upstreamFile } from "./mirror.js";
 
 const KEY = "roads:ne_10m_roads";
 
@@ -18,11 +20,13 @@ export function roadsOperation(descriptor) {
 /** Verified artifact (from the broker) → road graph. */
 export async function graphFromArtifact(artifact, op) {
   if (artifact?.verified !== true || artifact.sha256 !== op.artifact.sha256) throw new Error("road data was not verified");
-  const geojson = JSON.parse(await artifact.blob.text());
+  const file = await upstreamFile(artifact.blob, op.operation);
+  const geojson = JSON.parse(new TextDecoder().decode(file));
   const graph = buildRoadGraph(geojson, {
     source: {
       name: "Natural Earth 1:10m Roads", license: "Public domain (https://www.naturalearthdata.com/about/terms-of-use/)",
       revision: op.artifact.revision, sha256: artifact.sha256,
+      upstreamSha256: MIRRORED[op.operation].upstreamSha256, mirror: MIRRORED[op.operation].cid,
     },
   });
   const problems = graphProblems(graph);

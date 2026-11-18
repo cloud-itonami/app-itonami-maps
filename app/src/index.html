@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost https://raw.githubusercontent.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost https://yataverse.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>地図</title>
 <link rel="stylesheet" href="kotoba-client-consent.css">
 <link rel="stylesheet" href="style.css">
@@ -50,7 +50,7 @@
     </div>
     <div id="route-result" aria-live="polite"></div>
     <div id="roads">
-      <p class="hint">経路は端末内で計算します。そのための道路データ（Natural Earth 1:10m の主要道路とフェリー、約 50 MB）は、許可したときだけ raw.githubusercontent.com から取得し、SHA-256 を確かめてから端末内で変換・保存します。都市間の目安で、細かい道の案内ではありません。</p>
+      <p class="hint">経路は端末内で計算します。そのための道路データ（Natural Earth 1:10m の主要道路とフェリー、圧縮して約 6.8 MB）は、許可したときだけ Awai の保存網 Yataverse（yataverse.com）から取得し、元のファイルと同じかを SHA-256 で確かめてから端末内で変換・保存します。都市間の目安で、細かい道の案内ではありません。</p>
       <div class="row">
         <button id="roads-get" type="button">道路データを取得</button>
         <button id="roads-forget" type="button" class="secondary" hidden>道路データを削除</button>
@@ -60,7 +60,7 @@
   </details>
   <details id="detail">
     <summary>詳細な国境データ</summary>
-    <p class="muted">この端末には 1:110m の世界地図が入っていて、通信なしで使えます。1:50m の詳細な国境（約 3.1 MB）は、許可したときだけ raw.githubusercontent.com から取得し、SHA-256 を確かめてから端末に保存します。</p>
+    <p class="muted">この端末には 1:110m の世界地図が入っていて、通信なしで使えます。1:50m の詳細な国境（圧縮して約 1 MB）は、許可したときだけ Awai の保存網 Yataverse（yataverse.com）から取得し、元のファイルと同じかを SHA-256 で確かめてから端末に保存します。</p>
     <div class="row">
       <button id="detail-get" type="button">取得する</button>
       <button id="detail-forget" type="button" class="secondary" hidden>端末から削除</button>

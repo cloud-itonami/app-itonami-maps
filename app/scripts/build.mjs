@@ -35,7 +35,7 @@ if (conf.app.security.csp !== CSP) throw new Error("tauri.conf.json CSP is not t
 
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
-const sources = ["index.html", "style.css", "app.js", "geo.js", "map.js", "store.js", "detail.js", "route.js", "roads.js"];
+const sources = ["index.html", "style.css", "app.js", "geo.js", "map.js", "store.js", "detail.js", "route.js", "roads.js", "mirror.js"];
 for (const name of sources) await copyFile(resolve(root, "src", name), join(out, name));
 for (const name of Object.keys(pins.files)) await copyFile(resolve(root, "vendor", name), join(out, name));
 await writeFile(join(out, "descriptor.json"), JSON.stringify(descriptor, null, 2) + "\n");
