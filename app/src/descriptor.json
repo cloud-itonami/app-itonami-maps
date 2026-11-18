@@ -12,7 +12,7 @@
   "operations": [
     {
       "capability": "maps.basemap.download",
-      "service": "natural-earth",
+      "service": "yataverse",
       "operation": "download-admin0-countries-50m",
       "consent": "each-operation",
       "data-categories": [
@@ -20,19 +20,19 @@
         "user-agent"
       ],
       "endpoint": {
-        "origin": "https://raw.githubusercontent.com",
+        "origin": "https://yataverse.com",
         "method": "GET",
-        "path": "/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_50m_admin_0_countries.geojson"
+        "path": "/ipfs/bafkreieif7bmrdeglutkvsqaycc7cjlss2ueyx2fjd6f3srzd47el336tq"
       },
       "artifact": {
         "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
-        "sha256": "3e458fc036ad0a66411f2c1e6cac49c5d7bfb81cb1123bc513b22511a2b7fdeb",
-        "max-bytes": 4000000
+        "sha256": "882fc2c88c865d26aaca00c085f1257296a84c5f4548fc5dca391f3e45ef7e9c",
+        "max-bytes": 2000000
       }
     },
     {
       "capability": "maps.roads.download",
-      "service": "natural-earth",
+      "service": "yataverse",
       "operation": "download-roads-10m",
       "consent": "each-operation",
       "data-categories": [
@@ -40,14 +40,14 @@
         "user-agent"
       ],
       "endpoint": {
-        "origin": "https://raw.githubusercontent.com",
+        "origin": "https://yataverse.com",
         "method": "GET",
-        "path": "/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_roads.geojson"
+        "path": "/ipfs/bafkreif42rfyf2kyupx6crew5btgays52kyx7xx4nslioz2tnero4s63za"
       },
       "artifact": {
         "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
-        "sha256": "66a0c7b438e92fd124822cc5921cfa11042f48c294ade5e0f03f2c6640fd0248",
-        "max-bytes": 52000000
+        "sha256": "bcd44b82e958a3efe14496e86660625dd2b17fdefc6c968767536922ee4bdbc8",
+        "max-bytes": 8000000
       }
     }
   ]

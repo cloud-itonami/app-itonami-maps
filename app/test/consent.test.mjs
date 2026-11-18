@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { clientRuntimeProblems, clientRuntimeConnectSrc, createClientOperationBroker, verifyClientArtifact } from "../vendor/kotoba-client-runtime.js";
 import { decodeDetail, detailOperation } from "../dist/detail.js";
 import { roadsOperation, graphFromArtifact } from "../dist/roads.js";
+import { MIRRORED, upstreamFile } from "../dist/mirror.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (p) => readFile(resolve(root, p), "utf8");
@@ -23,25 +24,27 @@ test("the descriptor declares exactly two pinned, read-only downloads", () => {
   for (const o of [op, roadsOp]) {
     assert.equal(o.consent, "each-operation");
     assert.equal(o.endpoint.method, "GET");
-    assert.equal(o.endpoint.origin, "https://raw.githubusercontent.com");
-    assert.ok(o.endpoint.path.includes(o.artifact.revision), "the path is pinned to the same revision");
+    assert.equal(o.endpoint.origin, "https://yataverse.com", "served from Awai's own storage");
+    assert.equal(o.endpoint.path, `/ipfs/${MIRRORED[o.operation].cid}`);
+    assert.equal(o.service, "yataverse");
     assert.equal(o["redirect-origins"], undefined, "no redirect is followed");
     assert.deepEqual(o["data-categories"], ["ip-address", "user-agent"], "no location or route data is sent");
   }
   assert.notEqual(op.capability, roadsOp.capability, "each download is approved on its own");
-  assert.ok(roadsOp.endpoint.path.endsWith("/geojson/ne_10m_roads.geojson"));
+  assert.match(MIRRORED[roadsOp.operation].upstream, /geojson\/ne_10m_roads\.geojson$/);
+  assert.match(MIRRORED[op.operation].upstream, /geojson\/ne_50m_admin_0_countries\.geojson$/);
   assert.equal(descriptor.workers.length, 0);
   assert.equal(descriptor["local-state"].adapter, "indexeddb");
 });
 
 test("page and Tauri CSP allow only the declared origin besides IPC", async () => {
   const derived = clientRuntimeConnectSrc(descriptor, capabilities, [], []);
-  assert.equal(derived, "connect-src https://raw.githubusercontent.com");
+  assert.equal(derived, "connect-src https://yataverse.com");
   const html = await read("src/index.html");
   const conf = JSON.parse(await read("src-tauri/tauri.conf.json"));
   for (const csp of [html.match(/Content-Security-Policy" content="([^"]+)"/)[1], conf.app.security.csp]) {
     const connect = csp.split(";").map((s) => s.trim()).find((s) => s.startsWith("connect-src"));
-    assert.equal(connect, "connect-src ipc: http://ipc.localhost https://raw.githubusercontent.com");
+    assert.equal(connect, "connect-src ipc: http://ipc.localhost https://yataverse.com");
     assert.match(csp, /default-src 'none'/);
     assert.match(csp, /script-src 'self';/);
   }
@@ -153,7 +156,7 @@ test("an undeclared request is refused before any dialog or request", async () =
   const { broker, calls, host, restore } = await brokerWith("deny");
   try {
     const sel = { capability: op.capability, service: op.service, operation: op.operation };
-    await assert.rejects(broker.invoke(sel, { input: `${op.endpoint.origin}/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson` }), /does not match/);
+    await assert.rejects(broker.invoke(sel, { input: `${op.endpoint.origin}/ipfs/${MIRRORED[roadsOp.operation].cid}` }), /does not match/);
     await assert.rejects(broker.invoke(sel, { input: "https://example.com" + op.endpoint.path }), /does not match/);
     await assert.rejects(broker.invoke({ ...sel, operation: "other" }, { input: op.endpoint.origin + op.endpoint.path }), /not eligible/);
     assert.equal(host.seen.length, 0);
@@ -167,11 +170,40 @@ test("downloaded bytes are accepted only with the pinned digest", async () => {
   await assert.rejects(verifyClientArtifact(new Uint8Array(op.artifact["max-bytes"] + 1), op.artifact), /byte budget/);
 });
 
-test("the real pinned 1:50m file decodes to a usable basemap", { skip: !(await exists("../.agent-output/ne/ne_50m_admin_0_countries.geojson")) && "pinned 1:50m file not downloaded locally" }, async () => {
-  const bytes = new Uint8Array(await readFile(resolve(root, "../.agent-output/ne/ne_50m_admin_0_countries.geojson")));
+// A CIDv1 raw/sha2-256 names the block's SHA-256: base32 of 0x01 0x55 0x12 0x20 <digest>.
+function cidDigest(cid) {
+  assert.match(cid, /^b[a-z2-7]+$/);
+  const alphabet = "abcdefghijklmnopqrstuvwxyz234567";
+  let bits = 0, value = 0; const out = [];
+  for (const ch of cid.slice(1)) { value = (value << 5) | alphabet.indexOf(ch); bits += 5; if (bits >= 8) { out.push((value >> (bits - 8)) & 255); bits -= 8; } }
+  assert.deepEqual(out.slice(0, 4), [0x01, 0x55, 0x12, 0x20], "CIDv1, raw codec, sha2-256");
+  return Buffer.from(out.slice(4, 36)).toString("hex");
+}
+
+test("each Yataverse CID names exactly the digest the descriptor pins", () => {
+  for (const o of [op, roadsOp]) assert.equal(cidDigest(MIRRORED[o.operation].cid), o.artifact.sha256);
+});
+
+test("a block that is not the gzipped Natural Earth file is refused", async () => {
+  await assert.rejects(upstreamFile(new Blob(["not gzip"]), op.operation), /not valid gzip/);
+  const other = await new Response(new Blob(["{}"]).stream().pipeThrough(new CompressionStream("gzip"))).blob();
+  await assert.rejects(upstreamFile(other, op.operation), /does not match the Natural Earth file/);
+  await assert.rejects(upstreamFile(other, "unknown-op"), /no mirror pin/);
+});
+
+const NE = "../.agent-output/ne";
+test("the real 1:50m block decodes to a usable basemap", { skip: !(await exists(`${NE}/ne_50m_admin_0_countries.geojson.gz`)) && "mirrored 1:50m block not downloaded locally" }, async () => {
+  const bytes = new Uint8Array(await readFile(resolve(root, `${NE}/ne_50m_admin_0_countries.geojson.gz`)));
   const map = await decodeDetail(bytes, op);
   assert.ok(map.countries.length > 200);
-  assert.equal(map.source.sha256, op.artifact.sha256);
+  assert.equal(map.source.sha256, MIRRORED[op.operation].upstreamSha256);
+  assert.equal(map.source.mirror.sha256, op.artifact.sha256);
+});
+
+test("the real 1:10m roads block decompresses to the pinned upstream file", { skip: !(await exists(`${NE}/ne_10m_roads.geojson.gz`)) && "mirrored roads block not downloaded locally" }, async () => {
+  const bytes = await readFile(resolve(root, `${NE}/ne_10m_roads.geojson.gz`));
+  const file = await upstreamFile(new Blob([bytes]), roadsOp.operation);
+  assert.equal(file.byteLength, MIRRORED[roadsOp.operation].upstreamBytes);
 });
 
 async function exists(p) { try { await readFile(resolve(root, p)); return true; } catch { return false; } }

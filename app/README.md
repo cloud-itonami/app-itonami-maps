@@ -41,8 +41,29 @@ location (GPS) and turn-by-turn guidance are not implemented.
 |---|---|---|
 | `src/data/world-110m.json` (bundled) | Natural Earth 1:110m Admin 0 – Countries, `nvkelso/natural-earth-vector` @ `ca96624a56bd078437bca8184e78163e5039ad19`, input SHA-256 `6866c877…c977f` | public domain |
 | `src/data/places-50m.json` (bundled) | Natural Earth 1:50m Populated Places, same revision, input SHA-256 `da4662b7…8ee7` (`scripts/prepare-places.mjs`) | public domain |
-| road network download (optional) | same repository and revision, `geojson/ne_10m_roads.geojson`, SHA-256 `66a0c7b4…0248`, 50,474,096 bytes; converted on the device to a ~25 MB graph kept in IndexedDB | public domain |
-| 1:50m download (optional) | same repository and revision, `geojson/ne_50m_admin_0_countries.geojson`, SHA-256 `3e458fc0…7fdeb`, 3,083,490 bytes | public domain |
+| road network download (optional) | same repository and revision, `geojson/ne_10m_roads.geojson`, SHA-256 `66a0c7b4…0248`, 50,474,096 bytes; served gzipped from Yataverse (below); converted on the device to a ~25 MB graph kept in IndexedDB | public domain |
+| 1:50m download (optional) | same repository and revision, `geojson/ne_50m_admin_0_countries.geojson`, SHA-256 `3e458fc0…7fdeb`, 3,083,490 bytes; served gzipped from Yataverse (below) | public domain |
+
+### Mirror on Yataverse
+
+The two downloads come from Awai's own content-addressed storage, not GitHub
+(AWAI-3464). Each upstream file was gzipped with `gzip -n -9` and stored as one
+raw block (CIDv1, raw, sha2-256) on `yataverse.com`; the roads file would not
+fit the 16 MiB block limit otherwise, and the download shrinks about 7×.
+
+| file | CID | block SHA-256 | block bytes |
+|---|---|---|---|
+| 1:50m countries | `bafkreieif7bmrdeglutkvsqaycc7cjlss2ueyx2fjd6f3srzd47el336tq` | `882fc2c8…ef7e9c` | 1,022,494 |
+| 1:10m roads | `bafkreif42rfyf2kyupx6crew5btgays52kyx7xx4nslioz2tnero4s63za` | `bcd44b82…bdbc8` | 6,785,581 |
+
+Two pins apply: the broker accepts the block only with the descriptor's SHA-256
+(the same digest the CID names; a test checks this), and `src/mirror.js` accepts
+the decompressed file only with the upstream Natural Earth size and SHA-256.
+The upload returned signed Yataverse storage receipts; a receipt says the
+gateway stored and read back the bytes, not that they are retained or replicated.
+
+To re-mirror: download the pinned upstream file, `gzip -n -9 -c`, then
+`yataverse put`; the CID must equal the one above.
 
 `scripts/prepare-basemap.mjs <geojson>` regenerates the bundled file and refuses
 any input whose digest differs from the pin. Both files go through the same
@@ -53,15 +74,13 @@ disputed territory.
 ## Network and consent
 
 `src/descriptor.json` (`kotoba.app.client-runtime.v1`) declares two operations,
-each a fixed `GET` under
-`https://raw.githubusercontent.com/nvkelso/natural-earth-vector/<pinned revision>/geojson/`
-with `consent: each-operation`, data categories `ip-address`, `user-agent`, no
+each a fixed `GET https://yataverse.com/ipfs/<cid>` with `consent: each-operation`, data categories `ip-address`, `user-agent`, no
 redirects and an artifact pinned by revision, SHA-256 and byte budget:
 
 | operation | capability | file | budget |
 |---|---|---|---|
-| `download-admin0-countries-50m` | `maps.basemap.download` | `ne_50m_admin_0_countries.geojson` | 4,000,000 B |
-| `download-roads-10m` | `maps.roads.download` | `ne_10m_roads.geojson` | 52,000,000 B |
+| `download-admin0-countries-50m` | `maps.basemap.download` | `ne_50m_admin_0_countries.geojson` (gzip) | 2,000,000 B |
+| `download-roads-10m` | `maps.roads.download` | `ne_10m_roads.geojson` (gzip) | 8,000,000 B |
 
 Approving one does not approve the other; each request asks again. Route
 endpoints and results are never sent anywhere.
@@ -73,15 +92,20 @@ endpoints and results are never sent anywhere.
 - Every download shows the trusted consent dialog. **Deny sends no request.**
 - The build derives `connect-src` from the descriptor and fails if the page CSP
   or `src-tauri/tauri.conf.json` differ. Apart from Tauri IPC the only allowed
-  origin is `https://raw.githubusercontent.com`.
+  origin is `https://yataverse.com`.
+- The Tauri window uses `useHttpsScheme`, so the Android WebView origin is
+  `https://tauri.localhost`, the origin Yataverse answers with CORS on `/ipfs`.
+  Desktop (`tauri://localhost`) and a plain browser get no CORS header there,
+  so the two downloads work only in the Android app until Yataverse allows a
+  read-only CORS origin for them. Switching the scheme also moved the app's
+  IndexedDB to a new origin: state saved by earlier builds is not carried over.
 - The page itself uses no `fetch`: data and descriptor are built into ES modules.
 - Android requests `INTERNET` only for these two downloads. The Tauri host grants one
   read-only command (`awai_host_info`) and no filesystem, shell, HTTP or
   installer plugin.
 
 Known limits of the road download: the shared runtime bounds a download body to
-120 s, so on a link slower than about 3.5 Mbit/s the 50 MB file fails and must be
-retried. Parsing it needs several hundred MB of WebView memory, and on the
+120 s; at 6.8 MB that needs about 0.5 Mbit/s. Parsing it needs several hundred MB of WebView memory, and on the
 arm64 API 35 emulator the conversion took about 4 minutes.
 
 ## Build and test
