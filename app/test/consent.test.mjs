@@ -7,18 +7,34 @@ import { fileURLToPath } from "node:url";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { clientRuntimeProblems, clientRuntimeConnectSrc, createClientOperationBroker, verifyClientArtifact } from "../vendor/kotoba-client-runtime.js";
-import { decodeDetail, detailOperation } from "../dist/detail.js";
-import { roadsOperation, graphFromArtifact } from "../dist/roads.js";
-import { MIRRORED, upstreamFile } from "../dist/mirror.js";
+import { decodeDetail, detailOperation, verifyPinnedBytes } from "../src/detail.js";
+import { roadsOperation, graphFromArtifact } from "../src/roads.js";
+import { MIRRORED, upstreamFile } from "../src/mirror.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (p) => readFile(resolve(root, p), "utf8");
-const descriptor = JSON.parse(await read("src/descriptor.json"));
-const op = detailOperation(descriptor);
-const roadsOp = roadsOperation(descriptor);
+// The committed build declares nothing yet (the Yataverse recipient is not confirmed). The broker
+// tests below use the two candidate operations with a synthetic, test-only disclosure, so they keep
+// checking what will be sent once the recipient is confirmed.
+const committed = JSON.parse(await read("dist/descriptor.json"));
+const candidates = JSON.parse(await read("src/candidates.json"));
+const synthetic = { recipient: "Synthetic Test Recipient", country: "JP", data: ["取得するファイルの ID", "端末の IP アドレス"], "special-care": false,
+  purpose: "テストのため", frequency: "one-time", withdrawal: "設定 › 許可した送信" };
+const descriptor = { ...committed, operations: candidates.operations.map((o) => ({ ...o, disclosure: synthetic })) };
+const op = detailOperation(candidates);
+const roadsOp = roadsOperation(candidates);
+const declaredOf = (o) => descriptor.operations.find((d) => d.operation === o.operation);
 const capabilities = descriptor.operations.map((o) => o.capability);
 
-test("the descriptor declares exactly two pinned, read-only downloads", () => {
+test("the committed descriptor is restricted-wasm-v1 and declares nothing until Yataverse is confirmed", async () => {
+  assert.equal(committed.profile, "restricted-wasm-v1");
+  assert.deepEqual(committed.operations, []);
+  assert.equal(committed["local-state"].adapter, "memory");
+  assert.deepEqual(JSON.parse(await read("src/disclosures.json")).services, { yataverse: null });
+  assert.deepEqual(clientRuntimeProblems(committed, [], []), []);
+});
+
+test("the two candidates are pinned, read-only downloads (declared with a confirmed disclosure)", () => {
   assert.deepEqual(clientRuntimeProblems(descriptor, capabilities, []), []);
   assert.equal(descriptor.operations.length, 2);
   for (const o of [op, roadsOp]) {
@@ -34,20 +50,18 @@ test("the descriptor declares exactly two pinned, read-only downloads", () => {
   assert.match(MIRRORED[roadsOp.operation].upstream, /geojson\/ne_10m_roads\.geojson$/);
   assert.match(MIRRORED[op.operation].upstream, /geojson\/ne_50m_admin_0_countries\.geojson$/);
   assert.equal(descriptor.workers.length, 0);
-  assert.equal(descriptor["local-state"].adapter, "indexeddb");
 });
 
-test("page and Tauri CSP allow only the declared origin besides IPC", async () => {
-  const derived = clientRuntimeConnectSrc(descriptor, capabilities, [], []);
-  assert.equal(derived, "connect-src https://yataverse.com");
-  const html = await read("src/index.html");
+test("host page and Tauri CSP: IPC only while nothing is declared; the guest admitted by hash", async () => {
+  assert.equal(clientRuntimeConnectSrc(committed, [], [], []), "connect-src 'none'");
+  assert.equal(clientRuntimeConnectSrc(descriptor, descriptor.operations.map((o) => o.capability), [], []), "connect-src https://yataverse.com", "once declared");
+  const html = await read("dist/index.html");
   const conf = JSON.parse(await read("src-tauri/tauri.conf.json"));
-  for (const csp of [html.match(/Content-Security-Policy" content="([^"]+)"/)[1], conf.app.security.csp]) {
-    const connect = csp.split(";").map((s) => s.trim()).find((s) => s.startsWith("connect-src"));
-    assert.equal(connect, "connect-src ipc: http://ipc.localhost https://yataverse.com");
-    assert.match(csp, /default-src 'none'/);
-    assert.match(csp, /script-src 'self';/);
-  }
+  const csp = html.match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  assert.equal(conf.app.security.csp, csp);
+  assert.equal(csp.split(";").map((s) => s.trim()).find((s) => s.startsWith("connect-src")), "connect-src ipc: http://ipc.localhost");
+  assert.match(csp, /^default-src 'none'; script-src 'self' 'sha256-[^']+' 'sha256-[^']+'; style-src 'self' 'sha256-[^']+';/);
+  for (const tag of html.matchAll(/<script\b[^>]*>/gi)) assert.match(tag[0], /src=/);
 });
 
 test("only the vendored broker issues network requests", async () => {
@@ -81,7 +95,8 @@ test("release manifest pins every shipped file and the vendored runtime", async 
 // A stand-in for the trusted consent host: the broker accepts only hosts that
 // the runtime itself registered, so build one with a fake document whose
 // dialog we drive. Denying must leave fetch untouched.
-async function brokerWith(answer, operation = op) {
+async function brokerWith(answer, candidate = op) {
+  const operation = declaredOf(candidate);
   const calls = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => { calls.push(String(input?.url ?? input)); return new Response("{}"); };
@@ -121,7 +136,7 @@ function fakeConsentHost(runtime, answer) {
   finally { globalThis.document = previous; }
   function respond() {
     // A script can only deny: Allow counts only after a trusted press.
-    if (answer === "deny") listeners.get("button:Deny:click")({});
+    if (answer === "deny") listeners.get("button:許可しない:click")({});
   }
   void dialog;
   return { handle, seen };
@@ -168,6 +183,9 @@ test("downloaded bytes are accepted only with the pinned digest", async () => {
   const sample = new TextEncoder().encode(JSON.stringify({ type: "FeatureCollection", features: [] }));
   await assert.rejects(decodeDetail(sample, op), /digest mismatch/);
   await assert.rejects(verifyClientArtifact(new Uint8Array(op.artifact["max-bytes"] + 1), op.artifact), /byte budget/);
+  // The guest's own check of bytes already on the device (it has no runtime of its own).
+  await assert.rejects(verifyPinnedBytes(new Uint8Array(op.artifact["max-bytes"] + 1), op.artifact), /byte budget/);
+  await assert.rejects(verifyPinnedBytes(sample, op.artifact), /digest mismatch/);
 });
 
 // A CIDv1 raw/sha2-256 names the block's SHA-256: base32 of 0x01 0x55 0x12 0x20 <digest>.

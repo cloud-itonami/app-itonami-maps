@@ -1,0 +1,6 @@
+{
+  "note": "Recipient disclosures per service (KOTOBA-159 finding 9). null: not confirmed, so the service's operations are not declared and nothing is sent. The yataverse.com operator is not confirmed yet (Itonami item 68).",
+  "services": {
+    "yataverse": null
+  }
+}

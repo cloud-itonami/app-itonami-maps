@@ -1,14 +1,5 @@
 {
-  "schema": "kotoba.app.client-runtime.v1",
-  "target": "browser",
-  "profile": "trusted-page-v1",
-  "entry": "index.html",
-  "local-state": {
-    "adapter": "indexeddb",
-    "schema": "itonami.maps.v1",
-    "version": 1
-  },
-  "workers": [],
+  "note": "The operations this app would use (KOTOBA-159). scripts/build.mjs declares only those whose service has a confirmed disclosure (src/disclosures.json).",
   "operations": [
     {
       "capability": "maps.basemap.download",

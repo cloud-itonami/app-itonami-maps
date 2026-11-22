@@ -1,0 +1,24 @@
+{
+  "schema": "itonami.disabled-features.v1",
+  "note": "Features that worked before the restricted-wasm-v1 move and are off now. Decision 2026-11-22: the app is not released while this list is not empty (scripts/deploy-gate.mjs). Remove an entry only when the feature works again.",
+  "features": [
+    {
+      "id": "detail-download",
+      "label": "詳細な国境（1:50m）を取得する",
+      "reason": "The yataverse.com operator is not confirmed, so the download is not declared.",
+      "waits-for": "Itonami item 68 (yataverse operator)"
+    },
+    {
+      "id": "route-search",
+      "label": "道路データを取得し、経路を検索する",
+      "reason": "The road network comes only from the Yataverse download, which is not declared.",
+      "waits-for": "Itonami item 68 (yataverse operator)"
+    },
+    {
+      "id": "kept-on-device",
+      "label": "表示の位置と、取得したデータが端末に残る",
+      "reason": "The sandboxed guest has no storage until the runtime's host-mediated storage.",
+      "waits-for": "KOTOBA-968"
+    }
+  ]
+}
