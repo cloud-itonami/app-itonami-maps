@@ -5,15 +5,17 @@
 // file's upstream digest are both checked. Denying sends no request. The file is turned
 // into a compact graph on this device and only the graph is kept (IndexedDB).
 // Every route is then computed locally with no network.
-import { createClientOperationBroker } from "./kotoba-client-runtime.js";
+//
+// restricted-wasm-v1 (KOTOBA-159): the download is one operation on the host port (guest-port.js),
+// declared only when its recipient is confirmed; until then `selector` is null and download() refuses.
 import { buildRoadGraph, graphProblems, indexGraph } from "./route.js";
 import { MIRRORED, upstreamFile } from "./mirror.js";
 
 const KEY = "roads:ne_10m_roads";
 
-export function roadsOperation(descriptor) {
-  const op = descriptor.operations.find((o) => o.operation === "download-roads-10m");
-  if (!op) throw new Error("road operation is not declared");
+export function roadsOperation(candidates) {
+  const op = candidates.operations.find((o) => o.operation === "download-roads-10m");
+  if (!op) throw new Error("road operation is not a candidate");
   return op;
 }
 
@@ -34,18 +36,7 @@ export async function graphFromArtifact(artifact, op) {
   return graph;
 }
 
-export function createRoadSource({ descriptor, store, consentHost }) {
-  const op = roadsOperation(descriptor);
-  const selector = { capability: op.capability, service: op.service, operation: op.operation };
-  const broker = createClientOperationBroker({
-    runtime: descriptor,
-    // The runtime validates the whole descriptor, so every declared capability
-    // is requested; only this one operation is eligible through this broker.
-    requestedCapabilities: descriptor.operations.map((o) => o.capability),
-    approvedOperations: [op],
-    hostSupportedOperations: [[op.capability, op.service, op.operation]],
-    consentHost,
-  });
+export function createRoadSource({ op, selector, invoke, store }) {
   return {
     operation: op,
     /** The graph built earlier on this device, if it matches the pinned source. */
@@ -56,8 +47,10 @@ export function createRoadSource({ descriptor, store, consentHost }) {
       return indexGraph(saved);
     },
     /** Ask, download, verify, convert and keep. onPhase("convert") before the slow step. */
+    declared: Boolean(selector),
     async download({ signal, onPhase = () => {} } = {}) {
-      const artifact = await broker.invoke(selector, { input: op.endpoint.origin + op.endpoint.path }, { signal });
+      if (!selector) throw new Error("この取得は、送り先が確定するまで宣言されていません");
+      const artifact = await invoke(selector, { input: op.endpoint.origin + op.endpoint.path }, { signal });
       onPhase("convert");
       await new Promise((resolve) => setTimeout(resolve, 0)); // let the status repaint
       const graph = await graphFromArtifact(artifact, op);

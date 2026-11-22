@@ -4,7 +4,12 @@
 const DB = "itonami.maps.v1";
 const STORE = "kv";
 
-export function openStore(indexedDB = globalThis.indexedDB) {
+// Inside the restricted-wasm-v1 guest (an opaque-origin sandbox) IndexedDB is refused: reading it
+// can throw, and open() fails. Nothing is then kept and the app says so. When the runtime's
+// host-mediated storage is in use (KOTOBA-968), this module is the one place that changes.
+function defaultIndexedDB() { try { return globalThis.indexedDB ?? null; } catch { return null; } }
+
+export function openStore(indexedDB = defaultIndexedDB()) {
   let dbPromise = null;
   const db = () => {
     if (!indexedDB) return Promise.reject(new Error("IndexedDB unavailable"));

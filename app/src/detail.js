@@ -4,20 +4,33 @@
 // no request. The block is accepted only if its SHA-256 matches the
 // descriptor, and the decompressed file must match the upstream digest; the
 // copy kept on the device is re-verified the same way on every load.
-import { createClientOperationBroker, verifyClientArtifact } from "./kotoba-client-runtime.js";
+//
+// restricted-wasm-v1 (KOTOBA-159): this runs in the sandboxed guest. The download is one operation
+// on the host port (guest-port.js); the canonical broker on the host page asks and verifies. The
+// operation is declared only when its recipient's disclosure is confirmed: until then `selector` is
+// null and download() refuses before anything is sent.
 import { compactFromGeoJSON, basemapProblems } from "./geo.js";
 import { MIRRORED, upstreamFile } from "./mirror.js";
 
 const KEY = "detail:ne_50m_admin_0_countries";
 
-export function detailOperation(descriptor) {
-  const op = descriptor.operations.find((o) => o.operation === "download-admin0-countries-50m");
-  if (!op) throw new Error("detail operation is not declared");
+export function detailOperation(candidates) {
+  const op = candidates.operations.find((o) => o.operation === "download-admin0-countries-50m");
+  if (!op) throw new Error("detail operation is not a candidate");
   return op;
 }
 
+const hex = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+/** The artifact pin, checked on bytes already on this device (the guest has no runtime of its own). */
+export async function verifyPinnedBytes(bytes, declaration) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength > declaration["max-bytes"]) throw new Error("detail data exceeds its byte budget");
+  const sha256 = hex(await crypto.subtle.digest("SHA-256", bytes));
+  if (sha256 !== declaration.sha256) throw new Error("detail data digest mismatch");
+  return { blob: new Blob([bytes]), sha256, revision: declaration.revision, verified: true };
+}
+
 export async function decodeDetail(bytes, op) {
-  const verified = await verifyClientArtifact(bytes, op.artifact);
+  const verified = await verifyPinnedBytes(bytes, op.artifact);
   const file = await upstreamFile(verified.blob, op.operation);
   const geojson = JSON.parse(new TextDecoder().decode(file));
   const map = compactFromGeoJSON(geojson, {
@@ -34,18 +47,7 @@ export async function decodeDetail(bytes, op) {
   return map;
 }
 
-export function createDetailSource({ descriptor, store, consentHost }) {
-  const op = detailOperation(descriptor);
-  const selector = { capability: op.capability, service: op.service, operation: op.operation };
-  const broker = createClientOperationBroker({
-    runtime: descriptor,
-    // The runtime validates the whole descriptor, so every declared capability
-    // is requested; only this one operation is eligible through this broker.
-    requestedCapabilities: descriptor.operations.map((o) => o.capability),
-    approvedOperations: [op],
-    hostSupportedOperations: [[op.capability, op.service, op.operation]],
-    consentHost,
-  });
+export function createDetailSource({ op, selector, invoke, store }) {
   return {
     operation: op,
     /** Detail data already on this device, re-verified; null if none. */
@@ -56,8 +58,10 @@ export function createDetailSource({ descriptor, store, consentHost }) {
       catch { await store.delete(KEY); return null; }
     },
     /** Ask for consent, download, verify and keep. Throws if denied or invalid. */
+    declared: Boolean(selector),
     async download(signal) {
-      const artifact = await broker.invoke(selector, { input: op.endpoint.origin + op.endpoint.path }, { signal });
+      if (!selector) throw new Error("この取得は、送り先が確定するまで宣言されていません");
+      const artifact = await invoke(selector, { input: op.endpoint.origin + op.endpoint.path }, { signal });
       const bytes = new Uint8Array(await artifact.blob.arrayBuffer());
       const map = await decodeDetail(bytes, op);
       const kept = await store.set(KEY, bytes);

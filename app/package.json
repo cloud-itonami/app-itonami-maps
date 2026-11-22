@@ -11,8 +11,8 @@
     "build": "node scripts/build.mjs",
     "test": "npm run build && node --max-old-space-size=4096 --test test/*.test.mjs",
     "tauri": "tauri",
-    "build:desktop": "npm run build && tauri build --no-bundle",
-    "build:android": "npm run build && tauri android build --apk --target aarch64"
+    "build:desktop": "node scripts/deploy-gate.mjs && npm run build && tauri build --no-bundle",
+    "build:android": "node scripts/deploy-gate.mjs && npm run build && tauri android build --apk --target aarch64"
   },
   "devDependencies": {
     "@tauri-apps/cli": "3.0.0-alpha.6"
